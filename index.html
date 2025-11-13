@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<!-- El atributo lang se actualizará con JS -->
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- El título se actualizará con JS -->
+    <title>Hues and Cues Online</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        // Importa las funciones que necesitas de los SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, doc, onSnapshot, updateDoc, setDoc, serverTimestamp,
+            arrayUnion, arrayRemove, runTransaction 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Configuración de Firebase (Desde Replit Secrets) ---
+        const firebaseConfig = {
+            apiKey: import.meta.env.VITE_API_KEY,
+            authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+            projectId: import.meta.env.VITE_PROJECT_ID,
+            storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
+            messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
+            appId: import.meta.env.VITE_APP_ID
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // --- INICIO: LÓGICA DE INTERNACIONALIZACIÓN (i18n) ---
+
+        let currentLang = 'es'; // Idioma por defecto
+        const translations = {
+            es: {
+                // Títulos y Pantallas
+                title: "Hues and Cues Online",
+                langHeader: "Elige tu idioma",
+                loginHeader: "Hues and Cues",
+                loginSubheader: "Ingresa tu nombre para unirte al juego",
+                namePlaceholder: "Tu nombre...",
+                joinButton: "Entrar",
+                // Juego
+                playersHeader: "Jugadores (Máx 10)",
+                resetButton: "Reiniciar Juego (Borrar Todo)",
+                gameStatusWaiting: "Esperando jugadores... (Mínimo 2 para empezar)",
+                gameStatusReady: "¡Listos para empezar! Presiona 'Iniciar Juego'.",
+                gameStatusGameOver: "¡Juego Terminado! Viendo el podio...",
+                roundSelectorLabel: "Rondas:",
+                startGameButton: "Iniciar Juego",
+                nextRoundButton: "Siguiente Ronda",
+                chatHeader: "Chat Grupal",
+                chatPlaceholder: "Escribe un mensaje...",
+                sendButton: "Enviar",
+                // Modal de Pista
+                cueModalHeader: "¡Es tu turno!",
+                cueModalColorPrompt: "El color que debes describir es:",
+                cueModalCuePrompt: "Escribe una pista de una o dos palabras:",
+                cuePlaceholder: "Ej: Océano, Manzana",
+                cueSubmitButton: "¡Dar Pista!",
+                // Modal de Fin de Juego
+                gameOverHeader: "¡Juego Terminado!",
+                gameOverPodium: "Podio",
+                gameOver1st: "🥇 1er Lugar",
+                gameOver2nd: "🥈 2do Lugar",
+                gameOver3rd: "🥉 3er Lugar",
+                gameOverClose: "Volver al Lobby",
+                // Modal de Inactividad
+                inactivityHeader: "¿Sigues ahí?",
+                inactivityBody: "El juego se reiniciará por inactividad en menos de 1 minuto.",
+                inactivityClose: "Cerrar",
+                // Alertas y Mensajes Dinámicos
+                alertNameLength: "El nombre debe tener entre 2 y 15 caracteres.",
+                alertLobbyFull: "El lobby está lleno (máximo 10 jugadores).",
+                alertMinPlayers: "Se necesitan al menos 2 jugadores para empezar.",
+                alertCueLength: "La pista debe tener entre 1 y 20 caracteres.",
+                alertKickConfirm: "¿Estás seguro de que quieres eliminar a {playerName} del juego?",
+                alertKickError: "No se pudo eliminar al jugador.",
+                alertResetConfirm: "¿ESTÁS SEGURO?\n\nEsto borrará a todos los jugadores, el chat y los puntajes, y reiniciará el juego al lobby.\n\nEsta acción es irreversible.",
+                alertResetError: "No se pudo reiniciar el juego.",
+                // Mensajes de Sistema (Chat)
+                sysMsgJoined: "{playerName} se ha unido al juego.",
+                sysMsgKicked: "{playerName} ha sido eliminado del juego por {kickerName}.",
+                sysMsgGameStarted: "¡El juego ha comenzado! Turno de {playerName}.",
+                sysMsgCueIs: "La pista es: \"{cue}\"",
+                sysMsgGuessed: "{playerName} ha adivinado.",
+                sysMsgAllGuessed: "¡Todos han adivinado! {scoreSummary}",
+                sysMsgRound: "Ronda {round}. Turno de {playerName}.",
+                sysMsgNotEnoughPlayers: "No hay suficientes jugadores. Volviendo al lobby.",
+                sysMsgInactivityReset: "Juego reiniciado por inactividad.",
+                sysMsgResetBy: "El juego ha sido reiniciado por {playerName}.",
+                sysMsgGameOver: "¡Juego terminado! {playerName} ha ganado. Volviendo al lobby.",
+                // Barra de Estado (Dinámica)
+                statusBarTurn: "¡Es tu turno! Elige un color y da una pista.",
+                statusBarWaitingCue: "Esperando a que {playerName} dé una pista...",
+                statusBarWaitingGuess: " (Esperando conjeturas...)",
+                statusBarGuessed: " (¡Ya has adivinado! Esperando a los demás...)",
+                statusBarGuessNow: " (¡Haz clic en un color para adivinar!)",
+                statusBarRoundOver: "¡Ronda terminada! La respuesta era {color}.",
+                // Puntuación
+                scoreSummaryPrefix: "Puntuaciones de la ronda: ",
+                scoreSummaryCuer: "{playerName} (pista)",
+            },
+            en: {
+                // Titles and Screens
+                title: "Hues and Cues Online",
+                langHeader: "Choose your language",
+                loginHeader: "Hues and Cues",
+                loginSubheader: "Enter your name to join the game",
+                namePlaceholder: "Your name...",
+                joinButton: "Join",
+                // Game
+                playersHeader: "Players (Max 10)",
+                resetButton: "Reset Game (Delete All)",
+                gameStatusWaiting: "Waiting for players... (2+ needed to start)",
+                gameStatusReady: "Ready to start! Press 'Start Game'.",
+                gameStatusGameOver: "Game Over! Viewing podium...",
+                roundSelectorLabel: "Rounds:",
+                startGameButton: "Start Game",
+                nextRoundButton: "Next Round",
+                chatHeader: "Group Chat",
+                chatPlaceholder: "Type a message...",
+                sendButton: "Send",
+                // Cue Modal
+                cueModalHeader: "It's your turn!",
+                cueModalColorPrompt: "The color you must describe is:",
+                cueModalCuePrompt: "Write a one or two-word cue:",
+                cuePlaceholder: "Ex: Ocean, Apple",
+                cueSubmitButton: "Give Cue!",
+                // Game Over Modal
+                gameOverHeader: "Game Over!",
+                gameOverPodium: "Podium",
+                gameOver1st: "🥇 1st Place",
+                gameOver2nd: "🥈 2nd Place",
+                gameOver3rd: "🥉 3rd Place",
+                gameOverClose: "Back to Lobby",
+                // Inactivity Modal
+                inactivityHeader: "Are you still there?",
+                inactivityBody: "The game will reset due to inactivity in less than 1 minute.",
+                inactivityClose: "Close",
+                // Alerts and Dynamic Messages
+                alertNameLength: "Name must be between 2 and 15 characters.",
+                alertLobbyFull: "The lobby is full (max 10 players).",
+                alertMinPlayers: "You need at least 2 players to start.",
+                alertCueLength: "Cue must be between 1 and 20 characters.",
+                alertKickConfirm: "Are you sure you want to kick {playerName} from the game?",
+                alertKickError: "Could not kick player.",
+                alertResetConfirm: "ARE YOU SURE?\n\nThis will delete all players, chat, and scores, and restart the game lobby.\n\nThis action is irreversible.",
+                alertResetError: "Could not reset the game.",
+                // System Messages (Chat)
+                sysMsgJoined: "{playerName} has joined the game.",
+                sysMsgKicked: "{playerName} was kicked from the game by {kickerName}.",
+                sysMsgGameStarted: "The game has started! It's {playerName}'s turn.",
+                sysMsgCueIs: "The cue is: \"{cue}\"",
+                sysMsgGuessed: "{playerName} has guessed.",
+                sysMsgAllGuessed: "Everyone has guessed! {scoreSummary}",
+                sysMsgRound: "Round {round}. It's {playerName}'s turn.",
+                sysMsgNotEnoughPlayers: "Not enough players. Returning to lobby.",
+                sysMsgInactivityReset: "Game reset due to inactivity.",
+                sysMsgResetBy: "The game was reset by {playerName}.",
+                sysMsgGameOver: "Game Over! {playerName} has won. Returning to lobby.",
+                // Status Bar (Dynamic)
+                statusBarTurn: "It's your turn! Pick a color and give a cue.",
+                statusBarWaitingCue: "Waiting for {playerName} to give a cue...",
+                statusBarWaitingGuess: " (Waiting for guesses...)",
+                statusBarGuessed: " (You have guessed! Waiting for others...)",
+                statusBarGuessNow: " (Click a color to guess!)",
+                statusBarRoundOver: "Round over! The answer was {color}.",
+                // Scoring
+                scoreSummaryPrefix: "Round scores: ",
+                scoreSummaryCuer: "{playerName} (cuer)",
+            }
+        };
+
+        /**
+         * Obtiene una cadena de traducción.
+         * @param {string} key - La clave de la traducción.
+         * @param {Object} [replacements={}] - Un objeto de valores para reemplazar placeholders.
+         * @returns {string} - El texto traducido.
+         */
+        function t(key, replacements = {}) {
+            let text = translations[currentLang][key] || key;
+            for (const rKey in replacements) {
+                text = text.replace(`{${rKey}}`, replacements[rKey]);
+            }
+            return text;
+        }
+
+        /**
+         * Aplica el idioma seleccionado a todos los elementos estáticos de la UI.
+         * @param {string} lang - 'es' o 'en'
+         */
+        function applyLanguage(lang) {
+            if (lang !== 'es' && lang !== 'en') lang = 'es';
+            currentLang = lang;
+
+            document.documentElement.lang = lang;
+            document.title = t('title');
+
+            // Actualizar todos los elementos con data-i18n
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                    if (el.placeholder !== undefined) {
+                        el.placeholder = t(key);
+                    }
+                } else {
+                    el.textContent = t(key);
+                }
+            });
+        }
+
+        // --- FIN: LÓGICA DE INTERNACIONALIZACIÓN ---
+
+        // --- Variables Globales del Juego ---
+        let userId = null;
+        let localPlayerName = null;
+        let lobbyDocRef = null;
+        let localGameState = null; // Caché local del estado del juego
+        let inactivityTimer = null;
+        let inactivityWarningTimer = null;
+        
+        // Referencia al documento único del lobby
+        const LOBBY_ID = "main_lobby";
+
+        // --- Pantallas ---
+        let languageScreen;
+        let loginScreen;
+        let gameScreen;
+        let playerNameInput;
+        let loginButton;
+        let langEsButton;
+        let langEnButton;
+
+        // --- Elementos de la UI del Juego ---
+        let playerList;
+        let chatLog;
+        let chatInput;
+        let chatSendButton;
+        let colorBoard;
+        let gameInfoBar;
+        let startGameButton;
+        let cueInputModal;
+        let cueInputField;
+        let cueSubmitButton;
+        let cueTargetColorDiv;
+        let inactivityModal;
+        let inactivityCloseButton;
+        let nextRoundButton;
+        let resetGameButton;
+        let roundSelectorContainer; // <-- NUEVO
+        let roundSelector; // <-- NUEVO
+        let gameEndModal; // <-- NUEVO
+        let gameEndPodium; // <-- NUEVO
+        let gameEndCloseButton; // <-- NUEVO
+
+        // --- Generación del Tablero de Colores ---
+        const ROWS = 16; // A-P
+        const COLS = 30; // 1-30
+        let colorGridData = [];
+        const ROWS_LIST = 'ABCDEFGHIJKLMNOP'.split('');
+
+        function interpolateColor(color1, color2, factor) {
+            const r1 = parseInt(color1.substring(1, 3), 16);
+            const g1 = parseInt(color1.substring(3, 5), 16);
+            const b1 = parseInt(color1.substring(5, 7), 16);
+            const r2 = parseInt(color2.substring(1, 3), 16);
+            const g2 = parseInt(color2.substring(3, 5), 16);
+            const b2 = parseInt(color2.substring(5, 7), 16);
+            
+            const r = Math.round(r1 + factor * (r2 - r1));
+            const g = Math.round(g1 + factor * (g2 - g1));
+            const b = Math.round(b1 + factor * (b2 - b1));
+            
+            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        }
+        
+        /** Interpola un color a través de 3 puntos (esquina-medio-esquina) */
+        function interpolate3(c1, c2, c3, factor) {
+            if (factor < 0.5) {
+                // De c1 a c2
+                return interpolateColor(c1, c2, factor * 2);
+            } else {
+                // De c2 a c3
+                return interpolateColor(c2, c3, (factor - 0.5) * 2);
+            }
+        }
+        
+        /** Promedia dos colores hexadecimales */
+        function averageColors(color1, color2) {
+            const r1 = parseInt(color1.substring(1, 3), 16);
+            const g1 = parseInt(color1.substring(3, 5), 16);
+            const b1 = parseInt(color1.substring(5, 7), 16);
+            const r2 = parseInt(color2.substring(1, 3), 16);
+            const g2 = parseInt(color2.substring(3, 5), 16);
+            const b2 = parseInt(color2.substring(5, 7), 16);
+
+            const r = Math.round((r1 + r2) / 2);
+            const g = Math.round((g1 + g2) / 2);
+            const b = Math.round((b1 + b2) / 2);
+            
+            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        }
+
+        function generateColorBoard() {
+            colorGridData = []; // Limpiar datos anteriores
+            
+            // Gradiente Oscuro
+            const dark_tl = "#652910"; // Top-Left (Café)
+            const dark_tm = "#FF0000"; // Top-Mid (Rojo VIVO)
+            const dark_tr = "#74419B"; // Top-Right (Morado)
+            const dark_rm = "#0000FF"; // Right-Mid (Azul VIVO)
+            const dark_br = "#13AEE3"; // Bottom-Right (Celeste)
+            const dark_bm = "#00A000"; // Bottom-Mid (Verde VIVO)
+            const dark_bl = "#81A345"; // Bottom-Left (Verde)
+            const dark_lm = "#FFFF00"; // Left-Mid (Amarillo VIVO)
+
+            // Gradiente Claro
+            const light_tl = "#EBB5C8"; // Light Top-Left (Rosa)
+            const light_tm = "#FFC0CB"; // Light Top-Mid (Rosa Claro)
+            const light_tr = "#DCB3DA"; // Light Top-Right (Lila)
+            const light_rm = "#B0C4DE"; // Light Right-Mid (Azul Claro)
+            const light_br = "#C7DEE0"; // Light Bottom-Right (Celeste Claro)
+            const light_bm = "#90EE90"; // Light Bottom-Mid (Verde Claro)
+            const light_bl = "#D3E1D3"; // Light Bottom-Left (Verde Pálido)
+            const light_lm = "#FFFFE0"; // Light Left-Mid (Amarillo Claro)
+
+
+            const centerX = (COLS - 1) / 2.0;
+            const centerY = (ROWS - 1) / 2.0;
+            const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+
+            for (let i = 0; i < ROWS; i++) {
+                const y = i / (ROWS - 1); // Factor vertical (0 to 1)
+
+                for (let j = 0; j < COLS; j++) {
+                    const x = j / (COLS - 1); // Factor horizontal (0 to 1)
+
+                    // 2. Calcular el gradiente oscuro (promediando horizontal y vertical)
+                    const darkTopRow = interpolate3(dark_tl, dark_tm, dark_tr, x);
+                    const darkBottomRow = interpolate3(dark_bl, dark_bm, dark_br, x);
+                    const dark_color_from_rows = interpolateColor(darkTopRow, darkBottomRow, y);
+                    
+                    const darkLeftCol = interpolate3(dark_tl, dark_lm, dark_bl, y);
+                    const darkRightCol = interpolate3(dark_tr, dark_rm, dark_br, y);
+                    const dark_color_from_cols = interpolateColor(darkLeftCol, darkRightCol, x);
+                    
+                    const darkGradientColor = averageColors(dark_color_from_rows, dark_color_from_cols);
+
+
+                    // 3. Calcular el gradiente claro (promediando horizontal y vertical)
+                    const lightTopRow = interpolate3(light_tl, light_tm, light_tr, x);
+                    const lightBottomRow = interpolate3(light_bl, light_bm, light_br, x);
+                    const light_color_from_rows = interpolateColor(lightTopRow, lightBottomRow, y);
+
+                    const lightLeftCol = interpolate3(light_tl, light_lm, light_bl, y);
+                    const lightRightCol = interpolate3(light_tr, light_rm, light_br, y);
+                    const light_color_from_cols = interpolateColor(lightLeftCol, lightRightCol, x);
+
+                    const lightGradientColor = averageColors(light_color_from_rows, light_color_from_cols);
+
+
+                    // 4. Calcular la influencia del centro
+                    const dist = Math.sqrt(Math.pow(j - centerX, 2) + Math.pow(i - centerY, 2));
+                    let centerInfluence = 1 - (dist / maxDist); // 1.0 at center, 0.0 at corners
+
+                    // 5. Mezclar el gradiente oscuro con el gradiente claro
+                    const finalColor = interpolateColor(darkGradientColor, lightGradientColor, Math.pow(centerInfluence, 3.5)); 
+                    
+                    const coord = `${ROWS_LIST[i]}${j + 1}`;
+                    colorGridData.push({ coord, hex: finalColor });
+                }
+            }
+        }
+        // --- FIN DE CORRECCIÓN DE COLOR ---
+
+        function renderColorBoard() {
+            colorBoard.innerHTML = ''; // Limpiar tablero
+            colorGridData.forEach(({ coord, hex }) => {
+                const cell = document.createElement('div');
+                cell.classList.add('w-full', 'h-full', 'cursor-pointer', 'transition-all', 'duration-150', 'hover:scale-125', 'hover:z-10', 'relative', 'rounded-sm');
+                cell.style.backgroundColor = hex;
+                cell.dataset.coord = coord;
+                cell.title = coord; // Tooltip con la coordenada
+                
+                // Contenedor para marcadores (iniciales)
+                const markerContainer = document.createElement('div');
+                markerContainer.classList.add('absolute', 'inset-0', 'flex', 'items-center', 'justify-center', 'text-xs', 'font-bold', 'text-white', 'pointer-events-none');
+                markerContainer.id = `marker-${coord}`;
+                cell.appendChild(markerContainer);
+
+                cell.addEventListener('click', () => handleBoardClick(coord));
+                colorBoard.appendChild(cell);
+            });
+        }
+        
+        // --- Lógica de Autenticación y Lobby ---
+        
+        // Iniciar sesión
+        async function handleLogin() {
+            const name = playerNameInput.value.trim();
+            if (name.length < 2 || name.length > 15) {
+                alert(t('alertNameLength')); // <-- TRADUCIDO
+                return;
+            }
+            localPlayerName = name;
+            
+            // Ocultar login, mostrar juego
+            loginScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+
+            // Unirse al lobby (se activa después de que onAuthStateChanged obtenga el userId)
+            if (userId && lobbyDocRef) {
+                await joinLobby();
+            }
+        }
+
+        // Manejador de estado de autenticación
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                lobbyDocRef = doc(db, 'hues-and-cues-lobby', LOBBY_ID);
+                
+                // Si el usuario ya ingresó su nombre, unirse al lobby
+                if (localPlayerName) {
+                    await joinLobby();
+                }
+                
+                // Configurar el listener del lobby
+                setupLobbySnapshot();
+                
+                // Manejar desconexión
+                window.addEventListener('beforeunload', handleDisconnect);
+
+            } else {
+                // Si no hay usuario, intentar autenticación
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Error de autenticación:", error);
+                    document.body.innerHTML = "Error al conectar. Por favor, refresca la página.";
+                }
+            }
+        });
+
+        // Unirse al lobby (CORREGIDO)
+        async function joinLobby() {
+            if (!userId || !localPlayerName || !lobbyDocRef) return;
+            
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const lobbyDoc = await transaction.get(lobbyDocRef);
+                    const joinMessage = { 
+                        sender: "System", 
+                        text: t('sysMsgJoined', { playerName: localPlayerName }), // <-- TRADUCIDO
+                        timestamp: new Date()
+                    };
+                    
+                    if (!lobbyDoc.exists()) {
+                        // Si el lobby no existe, créalo
+                        const newLobbyState = getInitialLobbyState();
+                        newLobbyState.players.push({ id: userId, name: localPlayerName, score: 0, isOnline: true });
+                        // Añadir mensaje de bienvenida
+                        newLobbyState.chatMessages.push(joinMessage);
+                        transaction.set(lobbyDocRef, newLobbyState);
+                    } else {
+                        // El lobby existe, unirse
+                        const game = lobbyDoc.data();
+                        let players = game.players || [];
+                        let chatMessages = game.chatMessages || [];
+                        const existingPlayerIndex = players.findIndex(p => p.id === userId);
+
+                        if (existingPlayerIndex > -1) {
+                            // El jugador ya existe, solo actualizar estado y nombre
+                            players[existingPlayerIndex].isOnline = true;
+                            players[existingPlayerIndex].name = localPlayerName;
+                        } else if (players.length < 10) {
+                            // Nuevo jugador, añadir si hay espacio
+                            players.push({ id: userId, name: localPlayerName, score: 0, isOnline: true });
+                        } else {
+                            // Lobby lleno
+                            throw new Error(t('alertLobbyFull')); // <-- TRADUCIDO
+                        }
+                        
+                        // Añadir mensaje de bienvenida
+                        chatMessages.push(joinMessage);
+                        
+                        transaction.update(lobbyDocRef, { 
+                            players: players, 
+                            chatMessages: chatMessages, 
+                            lastActivity: serverTimestamp() 
+                        });
+                    }
+                });
+                // No llamamos a sendSystemMessage aquí, se maneja en la transacción
+            } catch (error) {
+                console.error("Error al unirse al lobby:", error);
+                alert(error.message); // La alerta ya estará traducida por el 'throw'
+                // Revertir UI
+                loginScreen.classList.remove('hidden');
+                gameScreen.classList.add('hidden');
+                localPlayerName = null;
+            }
+        }
+        
+        // Manejar desconexión
+        async function handleDisconnect() {
+            if (!userId || !lobbyDocRef) return;
+            
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const lobbyDoc = await transaction.get(lobbyDocRef);
+                    if (!lobbyDoc.exists()) return;
+
+                    const game = lobbyDoc.data();
+                    const players = game.players.map(p => 
+                        p.id === userId ? { ...p, isOnline: false } : p
+                    );
+                    
+                    let updates = { players: players };
+                    
+                    if (game.currentCueGiverId === userId && game.gameState !== "Lobby") {
+                        const updatedGame = { ...game, players: players };
+                        const nextTurnState = getNextTurnState(updatedGame);
+                        // Borra la propiedad temporal antes de actualizar
+                        delete nextTurnState._systemMessage;
+                        updates = { ...updates, ...nextTurnState };
+                    }
+                    
+                    transaction.update(lobbyDocRef, updates);
+                });
+            } catch (error) {
+                console.error("Error al desconectar:", error);
+            }
+        }
+
+        // Estado inicial del lobby
+        function getInitialLobbyState() {
+            return {
+                players: [],
+                chatMessages: [], 
+                gameState: "Lobby", // "Lobby", "GivingCue", "Guessing", "Scoring", "GameOver"
+                currentCueGiverId: null,
+                currentCue: "",
+                targetColor: "",
+                targetColorHex: "",
+                guesses: {}, 
+                lastActivity: serverTimestamp(),
+                round: 0,
+                totalRounds: 2, // <-- NUEVO: Default a 2 rondas
+                turnOrder: []
+            };
+        }
+        
+        // --- Listener Principal del Juego (Snapshot) ---
+        function setupLobbySnapshot() {
+            onSnapshot(lobbyDocRef, (doc) => {
+                if (!doc.exists()) {
+                    if (userId === localGameState?.players?.[0]?.id) {
+                        setDoc(lobbyDocRef, getInitialLobbyState());
+                    }
+                    return;
+                }
+                
+                const game = doc.data();
+                localGameState = game;
+                
+                updatePlayerListUI(game.players);
+                updateChatUI(game.chatMessages);
+                updateGameUI(game);
+                
+                resetInactivityTimers(game.lastActivity, game.gameState);
+            }, (error) => {
+                console.error("Error en el snapshot del lobby:", error);
+            });
+        }
+
+        // --- Actualizadores de UI ---
+
+        function updatePlayerListUI(players) {
+            playerList.innerHTML = '';
+            const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+            
+            sortedPlayers.forEach(player => {
+                const playerEl = document.createElement('div');
+                playerEl.classList.add('p-2', 'rounded-lg', 'mb-2', 'flex', 'justify-between', 'items-center', 'shadow', 'text-gray-800');
+                
+                if (player.id === userId) {
+                    playerEl.classList.add('bg-blue-200', 'font-bold', 'text-blue-900');
+                } else if (player.isOnline) {
+                    playerEl.classList.add('bg-gray-100');
+                } else {
+                    playerEl.classList.add('bg-gray-300', 'text-gray-500', 'line-through');
+                }
+                
+                let nameSuffix = '';
+                if (player.id === localGameState?.currentCueGiverId) {
+                    nameSuffix = ' 🎨';
+                }
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = `${player.name}${nameSuffix}`;
+                
+                const rightDiv = document.createElement('div');
+                rightDiv.classList.add('flex', 'items-center', 'space-x-2');
+                
+                const scoreSpan = document.createElement('span');
+                scoreSpan.classList.add('font-semibold');
+                scoreSpan.textContent = `${player.score} pts`;
+                rightDiv.appendChild(scoreSpan);
+                
+                if (player.id !== userId && player.isOnline) {
+                    const kickButton = document.createElement('button');
+                    kickButton.innerHTML = '❌';
+                    kickButton.title = `Eliminar a ${player.name}`;
+                    kickButton.classList.add('text-xs', 'p-1', 'rounded', 'opacity-50', 'hover:opacity-100', 'hover:bg-red-500', 'hover:text-white', 'transition-all');
+                    
+                    kickButton.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (confirm(t('alertKickConfirm', { playerName: player.name }))) { // <-- TRADUCIDO
+                            kickPlayer(player.id, player.name);
+                        }
+                    });
+                    
+                    rightDiv.appendChild(kickButton);
+                }
+                
+                playerEl.appendChild(nameSpan);
+                playerEl.appendChild(rightDiv);
+                playerList.appendChild(playerEl);
+            });
+        }
+
+        // --- Función para Eliminar Jugador (CORREGIDA) ---
+        async function kickPlayer(playerIdToKick, playerName) {
+            if (!lobbyDocRef) return;
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const lobbyDoc = await transaction.get(lobbyDocRef);
+                    if (!lobbyDoc.exists()) return;
+
+                    const game = lobbyDoc.data();
+                    const updatedPlayers = game.players.filter(p => p.id !== playerIdToKick);
+                    let updatedChatMessages = game.chatMessages || [];
+
+                    // 1. Define las actualizaciones base
+                    let updates = {
+                        players: updatedPlayers,
+                        lastActivity: serverTimestamp()
+                    };
+
+                    // 2. Prepara los mensajes del chat
+                    const kickMessage = {
+                        sender: "System",
+                        text: t('sysMsgKicked', { playerName: playerName, kickerName: localPlayerName }), // <-- TRADUCIDO
+                        timestamp: new Date()
+                    };
+                    updatedChatMessages.push(kickMessage);
+
+                    // 3. Revisa si hay que avanzar el turno
+                    if (game.currentCueGiverId === playerIdToKick && game.gameState !== "Lobby") {
+                        const updatedGame = { ...game, players: updatedPlayers };
+                        const nextTurnState = getNextTurnState(updatedGame); 
+                        updates = { ...updates, ...nextTurnState }; 
+
+                        if (nextTurnState._systemMessage) {
+                            updatedChatMessages.push({
+                                sender: "System",
+                                text: nextTurnState._systemMessage, // getNextTurnState ya lo traduce
+                                timestamp: new Date()
+                            });
+                            delete updates._systemMessage; 
+                        }
+                    }
+
+                    // 4. Añade el array de chat actualizado
+                    updates.chatMessages = updatedChatMessages;
+
+                    // 5. Ejecuta la transacción
+                    transaction.update(lobbyDocRef, updates);
+                });
+            } catch (error) {
+                console.error("Error al eliminar jugador:", error); 
+                alert(t('alertKickError')); // <-- TRADUCIDO
+            }
+        }
+
+        function updateChatUI(messages) {
+            if (!messages) return;
+            chatLog.innerHTML = '';
+            messages.slice(-50).forEach(msg => {
+                const msgEl = document.createElement('div');
+                msgEl.classList.add('mb-2');
+                
+                if (msg.sender === "System") {
+                    msgEl.classList.add('text-gray-500', 'italic');
+                    msgEl.textContent = msg.text;
+                } else {
+                    msgEl.classList.add('text-gray-100'); 
+                    msgEl.innerHTML = `<span class="font-bold">${msg.sender}:</span> <span class="font-medium">${msg.text}</span>`;
+                }
+                chatLog.appendChild(msgEl);
+            });
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function updateGameUI(game) {
+            clearBoardOverlays();
+            
+            const gameStatusText = document.getElementById('game-status-text');
+            if (!gameStatusText) return;
+
+            if (game.guesses) {
+                Object.entries(game.guesses).forEach(([playerId, coord]) => {
+                    const player = game.players.find(p => p.id === playerId);
+                    if (player) {
+                        renderMarker(coord, player.name.substring(0, 2).toUpperCase());
+                    }
+                });
+            }
+
+            // Ocultar todo por defecto, luego mostrar lo necesario
+            startGameButton.classList.add('hidden');
+            cueInputModal.classList.add('hidden');
+            nextRoundButton.classList.add('hidden');
+            roundSelectorContainer.classList.add('hidden');
+            gameEndModal.classList.add('hidden');
+            
+            switch (game.gameState) {
+                case "Lobby":
+                    gameStatusText.textContent = t('gameStatusWaiting');
+                    roundSelectorContainer.classList.remove('hidden'); // <-- MOSTRAR SELECTOR
+                    roundSelector.value = game.totalRounds || 2; // Sincronizar valor
+
+                    if (game.players.filter(p => p.isOnline).length >= 2) {
+                        startGameButton.classList.remove('hidden');
+                        gameStatusText.textContent = t('gameStatusReady');
+                    }
+                    break;
+                
+                case "GivingCue":
+                    const cueGiver = game.players.find(p => p.id === game.currentCueGiverId);
+                    if (!cueGiver) break; 
+                    
+                    if (game.currentCueGiverId === userId) {
+                        gameStatusText.textContent = t('statusBarTurn');
+                        showCueModal(game);
+                    } else {
+                        gameStatusText.textContent = t('statusBarWaitingCue', { playerName: cueGiver.name });
+                    }
+                    break;
+
+                case "Guessing":
+                    gameStatusText.innerHTML = `${t('sysMsgCueIs', { cue: game.currentCue })}`;
+                    const hasGuessed = game.guesses.hasOwnProperty(userId);
+                    const isCueGiver = game.currentCueGiverId === userId;
+
+                    if (isCueGiver) {
+                         gameStatusText.innerHTML += t('statusBarWaitingGuess');
+                    } else if (hasGuessed) {
+                        gameStatusText.innerHTML += t('statusBarGuessed');
+                    } else {
+                        gameStatusText.innerHTML += t('statusBarGuessNow');
+                    }
+                    break;
+                
+                case "Scoring":
+                    gameStatusText.textContent = t('statusBarRoundOver', { color: game.targetColor });
+                    highlightScoreZone(game.targetColor);
+                    
+                    if (game.currentCueGiverId === userId) {
+                        nextRoundButton.classList.remove('hidden');
+                    }
+                    break;
+
+                case "GameOver": // <-- NUEVO ESTADO
+                    gameStatusText.textContent = t('gameStatusGameOver');
+                    showPodium(game.players);
+                    gameEndModal.classList.remove('hidden');
+                    break;
+            }
+        }
+        
+        function renderMarker(coord, text) {
+            const markerContainer = document.getElementById(`marker-${coord}`);
+            if (markerContainer) {
+                const marker = document.createElement('div');
+                marker.classList.add('w-5', 'h-5', 'rounded-full', 'bg-black', 'bg-opacity-50', 'flex', 'items-center', 'justify-center', 'text-white', 'text-xs', 'font-bold', 'border-2', 'border-white');
+                marker.textContent = text;
+                markerContainer.appendChild(marker);
+            }
+        }
+        
+        function clearBoardOverlays() {
+            document.querySelectorAll('[id^="marker-"]').forEach(el => {
+                el.innerHTML = '';
+            });
+            document.querySelectorAll('.score-box, .target-box').forEach(el => {
+                el.remove();
+            });
+        }
+        
+        function highlightScoreZone(targetCoord) {
+            const targetCell = document.querySelector(`[data-coord="${targetCoord}"]`);
+            if (!targetCell) return;
+            
+            const targetMarker = document.createElement('div');
+            targetMarker.classList.add('absolute', 'inset-0', 'border-4', 'border-yellow-400', 'rounded-md', 'z-20', 'target-box', 'flex', 'items-center', 'justify-center');
+            targetMarker.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>`;
+            targetCell.appendChild(targetMarker);
+            
+            const { r, c } = coordToRowCol(targetCoord);
+            for (let i = r - 1; i <= r + 1; i++) {
+                for (let j = c - 1; j <= c + 1; j++) {
+                    if (i === r && j === c) continue;
+                    const coord = rowColToCoord(i, j);
+                    if (coord) {
+                        const cell = document.querySelector(`[data-coord="${coord}"]`);
+                        if (cell) {
+                            const overlay = document.createElement('div');
+                            overlay.classList.add('absolute', 'inset-0', 'bg-black', 'bg-opacity-30', 'z-10', 'rounded-sm', 'score-box');
+                            cell.appendChild(overlay);
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Lógica del Juego ---
+
+        async function handleStartGame() {
+            if (!localGameState || localGameState.gameState !== "Lobby") return;
+            if (localGameState.players.filter(p => p.isOnline).length < 2) {
+                alert(t('alertMinPlayers')); // <-- TRADUCIDO
+                return;
+            }
+            
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const lobbyDoc = await transaction.get(lobbyDocRef);
+                    if (!lobbyDoc.exists()) return;
+                    const game = lobbyDoc.data(); 
+                    let chatMessages = game.chatMessages || [];
+
+                    const onlinePlayers = game.players.filter(p => p.isOnline);
+                    const turnOrder = onlinePlayers.map(p => p.id).sort(() => Math.random() - 0.5);
+                    
+                    const randomColor = colorGridData[Math.floor(Math.random() * colorGridData.length)];
+
+                    chatMessages.push({ 
+                        sender: "System", 
+                        text: t('sysMsgGameStarted', { playerName: onlinePlayers.find(p=>p.id === turnOrder[0]).name }), // <-- TRADUCIDO
+                        timestamp: new Date() 
+                    });
+
+                    transaction.update(lobbyDocRef, {
+                        gameState: "GivingCue",
+                        round: 1,
+                        // totalRounds ya está guardado desde el selector
+                        turnOrder: turnOrder, 
+                        currentCueGiverId: turnOrder[0], 
+                        lastActivity: serverTimestamp(),
+                        guesses: {},
+                        targetColor: randomColor.coord,     
+                        targetColorHex: randomColor.hex,    
+                        currentCue: "",
+                        chatMessages: chatMessages 
+                    });
+                });
+            } catch (error) {
+                console.error("Error al iniciar juego:", error);
+                alert("No se pudo iniciar el juego."); 
+            }
+        }
+
+        function showCueModal(game) {
+            if (game.guesses.hasOwnProperty(userId)) {
+                return;
+            }
+            
+            const targetColor = game.targetColor;
+            const targetHex = game.targetColorHex;
+
+            if (!targetColor || !targetHex) {
+                return; 
+            }
+
+            cueTargetColorDiv.style.backgroundColor = targetHex;
+            cueTargetColorDiv.textContent = targetColor;
+            cueTargetColorDiv.dataset.hex = targetHex;
+            cueTargetColorDiv.dataset.coord = targetColor;
+            
+            cueInputField.value = '';
+            cueInputModal.classList.remove('hidden');
+        }
+
+        async function handleSubmitCue() {
+            const cue = cueInputField.value.trim();
+            
+            if (cue.length === 0 || cue.length > 20) {
+                alert(t('alertCueLength')); // <-- TRADUCIDO
+                return;
+            }
+            
+            cueInputModal.classList.add('hidden');
+            
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const lobbyDoc = await transaction.get(lobbyDocRef);
+                    if (!lobbyDoc.exists()) return;
+                    const game = lobbyDoc.data();
+                    let chatMessages = game.chatMessages || [];
+
+                    chatMessages.push({ 
+                        sender: "System", 
+                        text: t('sysMsgCueIs', { cue: cue }), // <-- TRADUCIDO
+                        timestamp: new Date()
+                    });
+
+                    transaction.update(lobbyDocRef, {
+                        gameState: "Guessing",
+                        currentCue: cue,
+                        lastActivity: serverTimestamp(),
+                        chatMessages: chatMessages 
+                    });
+                });
+            } catch (error) {
+                console.error("Error al enviar pista:", error);
+                alert("No se pudo enviar la pista."); 
+            }
+        }
+
+        async function handleBoardClick(coord) {
+            if (!localGameState || 
+                localGameState.gameState !== "Guessing" ||
+                localGameState.currentCueGiverId === userId ||
+                localGameState.guesses.hasOwnProperty(userId)) {
+                return;
+            }
+            
+            const guessUpdate = {};
+            guessUpdate[`guesses.${userId}`] = coord;
+            
+            await updateDoc(lobbyDocRef, {
+                ...guessUpdate,
+                lastActivity: serverTimestamp()
+            });
+            
+            sendSystemMessage(t('sysMsgGuessed', { playerName: localPlayerName })); // <-- TRADUCIDO
+            
+            checkIfRoundOver();
+        }
+
+        async function checkIfRoundOver() {
+            await runTransaction(db, async (transaction) => {
+                const lobbyDoc = await transaction.get(lobbyDocRef);
+                if (!lobbyDoc.exists()) return;
+                const game = lobbyDoc.data();
+                
+                if (game.gameState !== "Guessing") return;
+
+                const onlinePlayers = game.players.filter(p => p.isOnline);
+                const guessers = onlinePlayers.filter(p => p.id !== game.currentCueGiverId);
+                const numGuesses = Object.keys(game.guesses).length;
+                
+                // Asegurarse de que haya guessers antes de terminar
+                if (guessers.length > 0 && numGuesses >= guessers.length) {
+                    const newPlayersState = calculateScores(game);
+                    
+                    let chatMessages = game.chatMessages || [];
+                    chatMessages.push({ 
+                        sender: "System", 
+                        text: t('sysMsgAllGuessed', { scoreSummary: newPlayersState.scoreSummary }), // <-- TRADUCIDO
+                        timestamp: new Date()
+                    });
+                    
+                    transaction.update(lobbyDocRef, {
+                        gameState: "Scoring",
+                        players: newPlayersState.players,
+                        lastActivity: serverTimestamp(),
+                        chatMessages: chatMessages 
+                    });
+                }
+            });
+        }
+        
+        // --- MODIFICADO: Añadida lógica de fin de juego ---
+        async function handleNextRound() {
+            if (!localGameState || localGameState.gameState !== "Scoring" || localGameState.currentCueGiverId !== userId) {
+                return;
+            }
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const lobbyDoc = await transaction.get(lobbyDocRef);
+                    if (!lobbyDoc.exists()) return;
+                    const currentGame = lobbyDoc.data();
+
+                    // --- INICIO DE LÓGICA DE FIN DE JUEGO ---
+                    const onlinePlayers = currentGame.players.filter(p => p.isOnline);
+                    const newTurnOrder = currentGame.turnOrder.filter(id => onlinePlayers.some(p => p.id === id));
+                    const currentTurnIndex = newTurnOrder.indexOf(currentGame.currentCueGiverId);
+                    
+                    // Comprobar si fue el último turno de la ronda
+                    if ((currentTurnIndex + 1) >= newTurnOrder.length) {
+                        // Comprobar si fue la última ronda
+                        if (currentGame.round >= currentGame.totalRounds) {
+                            // ¡JUEGO TERMINADO!
+                            transaction.update(lobbyDocRef, {
+                                gameState: "GameOver",
+                                lastActivity: serverTimestamp()
+                            });
+                            return; // Salir, no iniciar nueva ronda
+                        }
+                    }
+                    // --- FIN DE LÓGICA DE FIN DE JUEGO ---
+
+                    // Si no es el fin, continuar a la siguiente ronda
+                    const nextTurnState = getNextTurnState(currentGame);
+
+                    let updates = {
+                        ...nextTurnState, 
+                        lastActivity: serverTimestamp()
+                    };
+
+                    let updatedChatMessages = currentGame.chatMessages || [];
+                    if (nextTurnState._systemMessage) {
+                        updatedChatMessages.push({
+                            sender: "System",
+                            text: nextTurnState._systemMessage, // ya está traducido por getNextTurnState
+                            timestamp: new Date()
+                        });
+                        delete updates._systemMessage;
+                    }
+                    updates.chatMessages = updatedChatMessages;
+
+                    transaction.update(lobbyDocRef, updates);
+                });
+            } catch (error) {
+                console.error("Error al pasar a la siguiente ronda:", error);
+                alert("No se pudo pasar a la siguiente ronda.");
+            }
+        }
+        
+        function getNextTurnState(game) {
+            const onlinePlayers = game.players.filter(p => p.isOnline);
+
+            if (onlinePlayers.length < 2) {
+                return { 
+                    players: game.players,
+                    gameState: "Lobby",
+                    currentCueGiverId: null,
+                    currentCue: "",
+                    targetColor: "",
+                    targetColorHex: "",
+                    guesses: {},
+                    round: 0,
+                    turnOrder: [],
+                    _systemMessage: t('sysMsgNotEnoughPlayers') // <-- TRADUCIDO
+                };
+            }
+
+            const newTurnOrder = game.turnOrder.filter(id => onlinePlayers.some(p => p.id === id));
+            const currentTurnIndex = newTurnOrder.indexOf(game.currentCueGiverId);
+            const nextTurnIndex = (currentTurnIndex + 1) % newTurnOrder.length;
+            const nextCueGiverId = newTurnOrder[nextTurnIndex];
+            // Incrementar la ronda SOLO si es el turno del primer jugador
+            const nextRound = (nextTurnIndex === 0) ? game.round + 1 : game.round;
+            const nextCueGiver = onlinePlayers.find(p => p.id === nextCueGiverId);
+
+            const randomColor = colorGridData[Math.floor(Math.random() * colorGridData.length)];
+
+            return {
+                gameState: "GivingCue",
+                round: nextRound,
+                turnOrder: newTurnOrder,
+                currentCueGiverId: nextCueGiverId,
+                guesses: {},
+                targetColor: randomColor.coord,     
+                targetColorHex: randomColor.hex,    
+                currentCue: "",
+                _systemMessage: t('sysMsgRound', { round: nextRound, playerName: nextCueGiver.name }) // <-- TRADUCIDO
+            };
+        }
+
+        // --- Cálculo de Puntuación ---
+        function coordToRowCol(coord) {
+            const r = ROWS_LIST.indexOf(coord.charAt(0));
+            const c = parseInt(coord.slice(1)) - 1; 
+            if (r === -1 || isNaN(c)) {
+                console.warn(`Coordenada inválida: ${coord}`);
+                return { r: 0, c: 0 }; // Fallback
+            }
+            return { r, c };
+        }
+        
+        function rowColToCoord(r, c) {
+            if (r < 0 || r >= ROWS_LIST.length || c < 0 || c >= COLS) return null;
+            const rowChar = ROWS_LIST[r];
+            const colNum = c + 1;
+            return `${rowChar}${colNum}`;
+        }
+        
+        function getDistance(coord1, coord2) {
+            const pos1 = coordToRowCol(coord1);
+            const pos2 = coordToRowCol(coord2);
+            const dr = Math.abs(pos1.r - pos2.r);
+            const dc = Math.abs(pos1.c - pos2.c);
+            return Math.max(dr, dc);
+        }
+        
+        function calculateScores(game) {
+            const { targetColor, guesses, players, currentCueGiverId } = game;
+            
+            const newScores = {};
+            players.forEach(p => newScores[p.id] = 0);
+            
+            const guessers = [];
+            Object.entries(guesses).forEach(([playerId, coord]) => {
+                if (playerId !== currentCueGiverId) {
+                    guessers.push({
+                        id: playerId,
+                        dist: getDistance(coord, targetColor)
+                    });
+                }
+            });
+
+            guessers.sort((a, b) => a.dist - b.dist);
+            
+            let scoreSummary = t('scoreSummaryPrefix'); // <-- TRADUCIDO
+            
+            let cueGiverPoints = 0;
+            
+            guessers.forEach(guess => {
+                const playerName = players.find(p => p.id === guess.id)?.name || 'Jugador';
+                if (guess.dist === 0) {
+                    newScores[guess.id] += 3;
+                    cueGiverPoints += 1; 
+                    scoreSummary += `${playerName} +3. `;
+                } else if (guess.dist === 1) {
+                    newScores[guess.id] += 2;
+                    cueGiverPoints += 1; 
+                    scoreSummary += `${playerName} +2. `;
+                } else if (guess.dist === 2) {
+                    newScores[guess.id] += 1;
+                    scoreSummary += `${playerName} +1. `;
+                }
+            });
+            
+            newScores[currentCueGiverId] = (newScores[currentCueGiverId] || 0) + cueGiverPoints;
+            const cuerName = players.find(p => p.id === currentCueGiverId)?.name || 'Dador';
+            scoreSummary += `${t('scoreSummaryCuer', { playerName: cuerName })} +${cueGiverPoints}.`; // <-- TRADUCIDO
+            
+            const updatedPlayers = players.map(player => ({
+                ...player,
+                score: player.score + (newScores[player.id] || 0)
+            }));
+            
+            return { players: updatedPlayers, scoreSummary: scoreSummary };
+        }
+        
+        
+        // --- Chat (CORREGIDO) ---
+        async function sendChatMessage() {
+            const text = chatInput.value.trim();
+            if (text.length === 0 || !localPlayerName) return;
+            
+            chatInput.value = ''; // Limpiar input
+            const newMsg = {
+                sender: localPlayerName,
+                text: text,
+                timestamp: new Date()
+            };
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const lobbyDoc = await transaction.get(lobbyDocRef);
+                    if (!lobbyDoc.exists()) return;
+                    const data = lobbyDoc.data();
+                    const currentMessages = data.chatMessages || [];
+                    const newMessages = [...currentMessages, newMsg];
+                    transaction.update(lobbyDocRef, { 
+                        chatMessages: newMessages,
+                        lastActivity: serverTimestamp()
+                    });
+                });
+            } catch (error) {
+                console.error("Error al enviar mensaje:", error);
+            }
+        }
+        
+        async function sendSystemMessage(text) {
+             const newMsg = {
+                sender: "System",
+                text: text, // El texto ya debe venir traducido de la función que lo llama
+                timestamp: new Date() 
+             };
+             try {
+                await runTransaction(db, async (transaction) => {
+                    const lobbyDoc = await transaction.get(lobbyDocRef);
+                    if (!lobbyDoc.exists()) return; 
+
+                    const data = lobbyDoc.data();
+                    const currentMessages = data.chatMessages || [];
+                    const newMessages = [...currentMessages, newMsg];
+                    
+                    transaction.update(lobbyDocRef, { 
+                        chatMessages: newMessages 
+                    });
+                });
+            } catch (error) {
+                console.error("Error al enviar mensaje de sistema:", error);
+            }
+        }
+        
+        // --- Inactividad ---
+        function resetInactivityTimers(lastActivity, gameState) {
+            clearTimeout(inactivityTimer);
+            clearTimeout(inactivityWarningTimer);
+            inactivityModal.classList.add('hidden');
+            
+            if (gameState === "Lobby" || gameState === "GameOver" || !lastActivity) return;
+            
+            const now = Date.now();
+            const lastActivityTime = lastActivity.toDate().getTime();
+            const timeSince = now - lastActivityTime;
+            
+            const warningTime = 4 * 60 * 1000;
+            const resetTime = 5 * 60 * 1000;
+
+            const timeToWarning = warningTime - timeSince;
+            const timeToReset = resetTime - timeSince;
+            
+            if (timeToReset <= 0) {
+                backToLobby(t('sysMsgInactivityReset'));
+            } else if (timeToWarning <= 0) {
+                inactivityModal.classList.remove('hidden');
+                inactivityTimer = setTimeout(() => backToLobby(t('sysMsgInactivityReset')), timeToReset);
+            } else {
+                inactivityWarningTimer = setTimeout(() => {
+                    inactivityModal.classList.remove('hidden');
+                }, timeToWarning);
+                inactivityTimer = setTimeout(() => backToLobby(t('sysMsgInactivityReset')), timeToReset);
+            }
+        }
+        
+        // --- MODIFICADO: resetGameToLobby ahora es backToLobby ---
+        async function backToLobby(systemMessage) {
+            if (!localGameState) return;
+
+            // Solo el primer jugador (host) debe hacer esto para evitar carreras
+            const onlinePlayers = localGameState.players.filter(p => p.isOnline);
+            if (onlinePlayers.length > 0 && onlinePlayers[0].id === userId) {
+                try {
+                    const newLobbyState = getInitialLobbyState();
+                    newLobbyState.players = localGameState.players.map(p => ({ 
+                        ...p, 
+                        score: 0 // Mantener jugadores pero resetear puntaje
+                    }));
+                    
+                    if (systemMessage) {
+                        newLobbyState.chatMessages = [{
+                            sender: "System",
+                            text: systemMessage,
+                            timestamp: new Date()
+                        }];
+                    }
+                    
+                    await setDoc(lobbyDocRef, newLobbyState);
+                } catch (e) {
+                    console.error("Error al volver al lobby:", e);
+                }
+            }
+        }
+        
+        // --- NUEVA FUNCIÓN DE RESET ---
+        async function handleResetGame() {
+            if (!lobbyDocRef) return;
+
+            // Pedir confirmación
+            const isConfirmed = confirm(t('alertResetConfirm')); // <-- TRADUCIDO
+
+            if (isConfirmed) {
+                try {
+                    // Obtener el estado inicial (vacío)
+                    const initialState = getInitialLobbyState();
+                    
+                    // Añadir un mensaje de que el juego fue reseteado
+                    initialState.chatMessages = [
+                        {
+                            sender: "System",
+                            text: t('sysMsgResetBy', { playerName: localPlayerName }), // <-- TRADUCIDO
+                            timestamp: new Date()
+                        }
+                    ];
+                    
+                    // Sobrescribir el documento del lobby con el estado inicial
+                    await setDoc(lobbyDocRef, initialState);
+                    
+                    // Forzar un refresco de la página local para el que lo reseteó
+                    window.location.reload();
+
+                } catch (error) {
+                    console.error("Error al reiniciar el juego:", error);
+                    alert(t('alertResetError')); // <-- TRADUCIDO
+                }
+            }
+        }
+
+        /**
+         * Maneja la selección de idioma
+         * @param {string} lang - 'es' o 'en'
+         */
+        function selectLanguage(lang) {
+            applyLanguage(lang);
+            languageScreen.classList.add('hidden');
+            loginScreen.classList.remove('hidden');
+        }
+
+        // --- NUEVO: Manejar cambio de selector de rondas ---
+        async function handleRoundChange() {
+            const newTotalRounds = parseInt(roundSelector.value, 10);
+            if (localGameState.totalRounds !== newTotalRounds) {
+                try {
+                    await updateDoc(lobbyDocRef, { totalRounds: newTotalRounds });
+                } catch (e) {
+                    console.error("Error al actualizar rondas:", e);
+                }
+            }
+        }
+        
+        // --- NUEVO: Mostrar el podio ---
+        function showPodium(players) {
+            const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+            let podiumHTML = `<h3 class="text-2xl font-bold mb-4" data-i18n="gameOverPodium">${t('gameOverPodium')}</h3>`;
+            
+            // 1er Lugar
+            if (sortedPlayers[0]) {
+                podiumHTML += `<div class="text-3xl font-bold text-yellow-500 mb-2">${t('gameOver1st')}: ${sortedPlayers[0].name} (${sortedPlayers[0].score} pts)</div>`;
+            }
+            // 2do Lugar
+            if (sortedPlayers[1]) {
+                podiumHTML += `<div class="text-2xl font-semibold text-gray-500 mb-2">${t('gameOver2nd')}: ${sortedPlayers[1].name} (${sortedPlayers[1].score} pts)</div>`;
+            }
+            // 3er Lugar
+            if (sortedPlayers[2]) {
+                podiumHTML += `<div class="text-xl font-medium text-yellow-700 mb-4">${t('gameOver3rd')}: ${sortedPlayers[2].name} (${sortedPlayers[2].score} pts)</div>`;
+            }
+
+            gameEndPodium.innerHTML = podiumHTML;
+        }
+
+        // --- Inicialización ---
+        function init() {
+            // Asignamos las variables AHORA que el DOM está cargado.
+            languageScreen = document.getElementById('language-screen');
+            loginScreen = document.getElementById('login-screen');
+            gameScreen = document.getElementById('game-screen');
+            playerNameInput = document.getElementById('player-name-input');
+            loginButton = document.getElementById('login-button');
+            langEsButton = document.getElementById('lang-es-button');
+            langEnButton = document.getElementById('lang-en-button');
+            playerList = document.getElementById('player-list');
+            chatLog = document.getElementById('chat-log');
+            chatInput = document.getElementById('chat-input');
+            chatSendButton = document.getElementById('chat-send-button');
+            colorBoard = document.getElementById('color-board');
+            gameInfoBar = document.getElementById('game-info-bar');
+            startGameButton = document.getElementById('start-game-button');
+            cueInputModal = document.getElementById('cue-input-modal');
+            cueInputField = document.getElementById('cue-input-field');
+            cueSubmitButton = document.getElementById('cue-submit-button');
+            cueTargetColorDiv = document.getElementById('cue-target-color');
+            inactivityModal = document.getElementById('inactivity-modal');
+            inactivityCloseButton = document.getElementById('inactivity-close-button');
+            nextRoundButton = document.getElementById('next-round-button');
+            resetGameButton = document.getElementById('reset-game-button');
+            roundSelectorContainer = document.getElementById('round-selector-container'); // <-- NUEVO
+            roundSelector = document.getElementById('round-selector'); // <-- NUEVO
+            gameEndModal = document.getElementById('game-over-modal'); // <-- NUEVO
+            gameEndPodium = document.getElementById('game-over-podium'); // <-- NUEVO
+            gameEndCloseButton = document.getElementById('game-over-close-button'); // <-- NUEVO
+
+            generateColorBoard();
+            renderColorBoard();
+            
+            // Mostrar pantalla de idioma primero
+            languageScreen.classList.remove('hidden');
+            loginScreen.classList.add('hidden');
+            gameScreen.classList.add('hidden');
+
+            // --- MOVER TODOS LOS LISTENERS AQUÍ ---
+            langEsButton.addEventListener('click', () => selectLanguage('es'));
+            langEnButton.addEventListener('click', () => selectLanguage('en'));
+            
+            loginButton.addEventListener('click', handleLogin);
+            
+            resetGameButton.addEventListener('click', handleResetGame);
+            roundSelector.addEventListener('change', handleRoundChange); // <-- NUEVO
+            
+            startGameButton.addEventListener('click', handleStartGame);
+            cueSubmitButton.addEventListener('click', handleSubmitCue);
+            nextRoundButton.addEventListener('click', handleNextRound);
+            
+            chatSendButton.addEventListener('click', sendChatMessage);
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendChatMessage();
+            });
+
+            inactivityCloseButton.addEventListener('click', () => {
+                inactivityModal.classList.add('hidden');
+            });
+            
+            gameEndCloseButton.addEventListener('click', () => { // <-- NUEVO
+                gameEndModal.classList.add('hidden');
+                // El host debe triggerear el reseteo
+                if (localGameState.players.filter(p => p.isOnline)[0].id === userId) {
+                    backToLobby(t('sysMsgGameOver', { playerName: localGameState.players.sort((a,b) => b.score - a.score)[0].name }));
+                }
+            });
+        }
+
+        // Llamar a init() solo cuando el DOM esté listo
+        window.addEventListener('DOMContentLoaded', init);
+        
+    </script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans antialiased h-screen overflow-hidden">
+
+    <!-- PANTALLA DE IDIOMA (NUEVA) -->
+    <div id="language-screen" class="h-full flex items-center justify-center">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-sm text-center">
+            <h1 class="text-3xl font-bold text-center text-white mb-6" data-i18n="langHeader">Choose your language</h1>
+            <div class="flex flex-col space-y-4">
+                <button id="lang-es-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-200 shadow-lg">
+                    Español
+                </button>
+                <button id="lang-en-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-200 shadow-lg">
+                    English
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pantalla de Login (AHORA OCULTA POR DEFECTO) -->
+    <div id="login-screen" class="hidden h-full flex items-center justify-center">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-sm">
+            <h1 class="text-3xl font-bold text-center text-white mb-6" data-i18n="loginHeader">Hues and Cues</h1>
+            <p class="text-center text-gray-400 mb-6" data-i18n="loginSubheader">Ingresa tu nombre para unirte al juego</p>
+            <input id="player-name-input" type="text" data-i18n="namePlaceholder" placeholder="Tu nombre..." class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500 mb-4" maxlength="15">
+            <button id="login-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-200 shadow-lg" data-i18n="joinButton">
+                Entrar
+            </button>
+        </div>
+    </div>
+
+    <!-- Pantalla de Juego -->
+    <div id="game-screen" class="hidden h-full flex flex-col md:flex-row">
+        
+        <div class="w-full md:w-1/5 bg-gray-800 p-4 overflow-y-auto flex-shrink-0 order-1 md:order-1 h-1/4 md:h-full">
+            <h2 class="text-xl font-semibold mb-4 text-white border-b border-gray-700 pb-2" data-i18n="playersHeader">Jugadores (Máx 10)</h2>
+            
+            <button id="reset-game-button" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg transition-colors duration-200 shadow-lg mb-4 text-sm" data-i18n="resetButton">
+                Reiniciar Juego (Borrar Todo)
+            </button>
+
+            <div id="player-list">
+                <!-- Jugadores se renderizan aquí -->
+            </div>
+        </div>
+
+        <div class="w-full md:w-3/5 bg-gray-900 flex flex-col h-2/4 md:h-full order-3 md:order-2">
+            <div id="game-info-bar" class="bg-gray-800 text-center p-3 text-lg font-medium shadow-md flex items-center justify-center space-x-4 h-[10%]">
+                <span id="game-status-text" data-i18n="gameStatusWaiting">Esperando jugadores...</span>
+                
+                <!-- NUEVO: Selector de Rondas -->
+                <div id="round-selector-container" class="hidden items-center space-x-2">
+                    <label for="round-selector" class="text-sm font-medium text-gray-300" data-i18n="roundSelectorLabel">Rondas:</label>
+                    <select id="round-selector" class="bg-gray-700 text-white border border-gray-600 rounded-md py-1 px-2 text-sm focus:outline-none focus:border-blue-500">
+                        <option value="1">1</option>
+                        <option value="2" selected>2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                </div>
+                
+                <button id="start-game-button" class="hidden bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-5 rounded-lg transition-colors shadow" data-i18n="startGameButton">
+                    Iniciar Juego
+                </button>
+                <button id="next-round-button" class="hidden bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-5 rounded-lg transition-colors shadow" data-i18n="nextRoundButton">
+                    Siguiente Ronda
+                </button>
+            </div>
+            
+            <div id="color-board" class="flex-grow p-4 grid overflow-auto" style="grid-template-columns: repeat(30, minmax(0, 1fr)); grid-template-rows: repeat(16, minmax(0, 1fr)); gap: 2px;">
+                <!-- Celdas de color se renderizan aquí -->
+            </div>
+        </div>
+
+        <div class="w-full md:w-1/5 bg-gray-800 flex flex-col p-4 order-2 md:order-3 h-1/4 md:h-full">
+            <h2 class="text-xl font-semibold mb-4 text-white border-b border-gray-700 pb-2" data-i18n="chatHeader">Chat Grupal</h2>
+            <div id="chat-log" class="flex-grow overflow-y-auto mb-4 bg-gray-700 rounded-lg p-3 text-sm">
+                <!-- Los mensajes de chat se renderizan aquí -->
+            </div>
+            <div class="flex">
+                <input id="chat-input" type="text" data-i18n="chatPlaceholder" placeholder="Escribe un mensaje..." class="flex-grow px-3 py-2 rounded-l-lg bg-gray-600 text-white border border-gray-500 focus:outline-none focus:border-blue-500">
+                <button id="chat-send-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-r-lg" data-i18n="sendButton">
+                    Enviar
+                </button>
+            </div>
+        </div>
+
+    </div>
+    
+    <div id="cue-input-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-md text-center">
+            <h2 class="text-2xl font-bold mb-4" data-i18n="cueModalHeader">¡Es tu turno!</h2>
+            <p class="text-gray-400 mb-4" data-i18n="cueModalColorPrompt">El color que debes describir es:</p>
+            <div id="cue-target-color" class="w-full h-24 rounded-lg mb-4 flex items-center justify-center text-2xl font-bold text-white shadow-inner" style="text-shadow: 1px 1px 2px #000;">
+                <!-- Color y coordenada se renderizan aquí -->
+            </div>
+            <p class="text-gray-400 mb-4" data-i18n="cueModalCuePrompt">Escribe una pista de una o dos palabras:</p>
+            <input id="cue-input-field" type="text" data-i18n="cuePlaceholder" placeholder="Ej: Océano, Manzana" class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500 mb-6" maxlength="20">
+            <button id="cue-submit-button" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-200 shadow-lg" data-i18n="cueSubmitButton">
+                ¡Dar Pista!
+            </button>
+        </div>
+    </div>
+    
+    <div id="inactivity-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-md text-center">
+            <h2 class="text-2xl font-bold mb-4 text-yellow-400" data-i18n="inactivityHeader">¿Sigues ahí?</h2>
+            <p class="text-gray-300 mb-6" data-i18n="inactivityBody">El juego se reiniciará por inactividad en menos de 1 minuto.</p>
+            <button id="inactivity-close-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors duration-200" data-i18n="inactivityClose">
+                Cerrar
+            </button>
+        </div>
+    </div>
+
+    <!-- NUEVO: Modal de Fin de Juego -->
+    <div id="game-over-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-md text-center text-white">
+            <h2 class="text-3xl font-bold mb-6" data-i18n="gameOverHeader">¡Juego Terminado!</h2>
+            
+            <div id="game-over-podium" class="space-y-3 mb-8">
+                <!-- El podio se genera con JS -->
+            </div>
+            
+            <button id="game-over-close-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-200 shadow-lg" data-i18n="gameOverClose">
+                Volver al Lobby
+            </button>
+        </div>
+    </div>
+
+</body>
+</html>
