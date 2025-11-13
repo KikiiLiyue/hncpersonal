@@ -16,14 +16,14 @@
             arrayUnion, arrayRemove, runTransaction 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Configuración de Firebase (Desde Replit Secrets) ---
+        // --- Configuración de Firebase ---
         const firebaseConfig = {
-            apiKey: import.meta.env.VITE_API_KEY,
-            authDomain: import.meta.env.VITE_AUTH_DOMAIN,
-            projectId: import.meta.env.VITE_PROJECT_ID,
-            storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
-            messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
-            appId: import.meta.env.VITE_APP_ID
+            apiKey: "AIzaSyBWVtHrkxrMwCSX2VWS8XYek9ALCQEgXCg",
+            authDomain: "huesandcues-2f684.firebaseapp.com",
+            projectId: "huesandcues-2f684",
+            storageBucket: "huesandcues-2f684.firebasestorage.app",
+            messagingSenderId: "682992693655",
+            appId: "1:682992693655:web:8ce90e1585b69c98ffd4d2"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -250,11 +250,11 @@
         let inactivityCloseButton;
         let nextRoundButton;
         let resetGameButton;
-        let roundSelectorContainer; // <-- NUEVO
-        let roundSelector; // <-- NUEVO
-        let gameEndModal; // <-- NUEVO
-        let gameEndPodium; // <-- NUEVO
-        let gameEndCloseButton; // <-- NUEVO
+        let roundSelectorContainer; 
+        let roundSelector; 
+        let gameEndModal; 
+        let gameEndPodium; 
+        let gameEndCloseButton; 
 
         // --- Generación del Tablero de Colores ---
         const ROWS = 16; // A-P
@@ -485,7 +485,7 @@
                             players.push({ id: userId, name: localPlayerName, score: 0, isOnline: true });
                         } else {
                             // Lobby lleno
-                            throw new Error(t('alertLobbyFull')); // <-- TRADUCIDO
+                            throw new Error(t('alertLobbyFull')); 
                         }
                         
                         // Añadir mensaje de bienvenida
@@ -501,7 +501,7 @@
                 // No llamamos a sendSystemMessage aquí, se maneja en la transacción
             } catch (error) {
                 console.error("Error al unirse al lobby:", error);
-                alert(error.message); // La alerta ya estará traducida por el 'throw'
+                alert(error.message); 
                 // Revertir UI
                 loginScreen.classList.remove('hidden');
                 gameScreen.classList.add('hidden');
@@ -553,7 +553,7 @@
                 guesses: {}, 
                 lastActivity: serverTimestamp(),
                 round: 0,
-                totalRounds: 2, // <-- NUEVO: Default a 2 rondas
+                totalRounds: 2, // Default 
                 turnOrder: []
             };
         }
@@ -637,7 +637,7 @@
             });
         }
 
-        // --- Función para Eliminar Jugador (CORREGIDA) ---
+        // --- Función para Eliminar Jugador ---
         async function kickPlayer(playerIdToKick, playerName) {
             if (!lobbyDocRef) return;
 
@@ -673,7 +673,7 @@
                         if (nextTurnState._systemMessage) {
                             updatedChatMessages.push({
                                 sender: "System",
-                                text: nextTurnState._systemMessage, // getNextTurnState ya lo traduce
+                                text: nextTurnState._systemMessage, 
                                 timestamp: new Date()
                             });
                             delete updates._systemMessage; 
@@ -905,7 +905,7 @@
             const cue = cueInputField.value.trim();
             
             if (cue.length === 0 || cue.length > 20) {
-                alert(t('alertCueLength')); // <-- TRADUCIDO
+                alert(t('alertCueLength')); 
                 return;
             }
             
@@ -920,7 +920,7 @@
 
                     chatMessages.push({ 
                         sender: "System", 
-                        text: t('sysMsgCueIs', { cue: cue }), // <-- TRADUCIDO
+                        text: t('sysMsgCueIs', { cue: cue }), 
                         timestamp: new Date()
                     });
 
@@ -953,7 +953,7 @@
                 lastActivity: serverTimestamp()
             });
             
-            sendSystemMessage(t('sysMsgGuessed', { playerName: localPlayerName })); // <-- TRADUCIDO
+            sendSystemMessage(t('sysMsgGuessed', { playerName: localPlayerName })); 
             
             checkIfRoundOver();
         }
@@ -977,7 +977,7 @@
                     let chatMessages = game.chatMessages || [];
                     chatMessages.push({ 
                         sender: "System", 
-                        text: t('sysMsgAllGuessed', { scoreSummary: newPlayersState.scoreSummary }), // <-- TRADUCIDO
+                        text: t('sysMsgAllGuessed', { scoreSummary: newPlayersState.scoreSummary }), 
                         timestamp: new Date()
                     });
                     
@@ -991,7 +991,7 @@
             });
         }
         
-        // --- MODIFICADO: Añadida lógica de fin de juego ---
+        // --- Añadida lógica de fin de juego ---
         async function handleNextRound() {
             if (!localGameState || localGameState.gameState !== "Scoring" || localGameState.currentCueGiverId !== userId) {
                 return;
@@ -1034,7 +1034,7 @@
                     if (nextTurnState._systemMessage) {
                         updatedChatMessages.push({
                             sender: "System",
-                            text: nextTurnState._systemMessage, // ya está traducido por getNextTurnState
+                            text: nextTurnState._systemMessage, 
                             timestamp: new Date()
                         });
                         delete updates._systemMessage;
@@ -1063,7 +1063,7 @@
                     guesses: {},
                     round: 0,
                     turnOrder: [],
-                    _systemMessage: t('sysMsgNotEnoughPlayers') // <-- TRADUCIDO
+                    _systemMessage: t('sysMsgNotEnoughPlayers') 
                 };
             }
 
@@ -1086,7 +1086,7 @@
                 targetColor: randomColor.coord,     
                 targetColorHex: randomColor.hex,    
                 currentCue: "",
-                _systemMessage: t('sysMsgRound', { round: nextRound, playerName: nextCueGiver.name }) // <-- TRADUCIDO
+                _systemMessage: t('sysMsgRound', { round: nextRound, playerName: nextCueGiver.name }) 
             };
         }
 
@@ -1134,7 +1134,7 @@
 
             guessers.sort((a, b) => a.dist - b.dist);
             
-            let scoreSummary = t('scoreSummaryPrefix'); // <-- TRADUCIDO
+            let scoreSummary = t('scoreSummaryPrefix'); 
             
             let cueGiverPoints = 0;
             
@@ -1156,7 +1156,7 @@
             
             newScores[currentCueGiverId] = (newScores[currentCueGiverId] || 0) + cueGiverPoints;
             const cuerName = players.find(p => p.id === currentCueGiverId)?.name || 'Dador';
-            scoreSummary += `${t('scoreSummaryCuer', { playerName: cuerName })} +${cueGiverPoints}.`; // <-- TRADUCIDO
+            scoreSummary += `${t('scoreSummaryCuer', { playerName: cuerName })} +${cueGiverPoints}.`; 
             
             const updatedPlayers = players.map(player => ({
                 ...player,
@@ -1167,7 +1167,7 @@
         }
         
         
-        // --- Chat (CORREGIDO) ---
+        // --- Chat ---
         async function sendChatMessage() {
             const text = chatInput.value.trim();
             if (text.length === 0 || !localPlayerName) return;
@@ -1251,7 +1251,7 @@
             }
         }
         
-        // --- MODIFICADO: resetGameToLobby ahora es backToLobby ---
+        // --- resetGameToLobby ahora es backToLobby ---
         async function backToLobby(systemMessage) {
             if (!localGameState) return;
 
@@ -1285,7 +1285,7 @@
             if (!lobbyDocRef) return;
 
             // Pedir confirmación
-            const isConfirmed = confirm(t('alertResetConfirm')); // <-- TRADUCIDO
+            const isConfirmed = confirm(t('alertResetConfirm')); 
 
             if (isConfirmed) {
                 try {
@@ -1296,7 +1296,7 @@
                     initialState.chatMessages = [
                         {
                             sender: "System",
-                            text: t('sysMsgResetBy', { playerName: localPlayerName }), // <-- TRADUCIDO
+                            text: t('sysMsgResetBy', { playerName: localPlayerName }), 
                             timestamp: new Date()
                         }
                     ];
@@ -1309,7 +1309,7 @@
 
                 } catch (error) {
                     console.error("Error al reiniciar el juego:", error);
-                    alert(t('alertResetError')); // <-- TRADUCIDO
+                    alert(t('alertResetError')); 
                 }
             }
         }
@@ -1403,7 +1403,7 @@
             loginButton.addEventListener('click', handleLogin);
             
             resetGameButton.addEventListener('click', handleResetGame);
-            roundSelector.addEventListener('change', handleRoundChange); // <-- NUEVO
+            roundSelector.addEventListener('change', handleRoundChange); 
             
             startGameButton.addEventListener('click', handleStartGame);
             cueSubmitButton.addEventListener('click', handleSubmitCue);
@@ -1418,7 +1418,7 @@
                 inactivityModal.classList.add('hidden');
             });
             
-            gameEndCloseButton.addEventListener('click', () => { // <-- NUEVO
+            gameEndCloseButton.addEventListener('click', () => { 
                 gameEndModal.classList.add('hidden');
                 // El host debe triggerear el reseteo
                 if (localGameState.players.filter(p => p.isOnline)[0].id === userId) {
@@ -1545,7 +1545,7 @@
         </div>
     </div>
 
-    <!-- NUEVO: Modal de Fin de Juego -->
+    <!-- Modal de Fin de Juego -->
     <div id="game-over-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
         <div class="bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-md text-center text-white">
             <h2 class="text-3xl font-bold mb-6" data-i18n="gameOverHeader">¡Juego Terminado!</h2>
